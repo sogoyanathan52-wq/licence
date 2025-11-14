@@ -1,0 +1,11 @@
+POST http://localhost:3000/api/algo/calcule
+Content-Type: application/json
+
+{
+  "superAdminId": 1,
+  "anneeCalcul": 2025,
+  "slotsL2": 2,
+  "slotsL3": 2,
+  "idGagnantL4": 1
+}
+

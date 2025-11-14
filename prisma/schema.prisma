@@ -1,0 +1,353 @@
+
+
+
+
+// // ======================================================
+// //               CONFIGURATION DE LA BASE
+// // ======================================================
+// generator client {
+//   provider = "prisma-client-js"
+// }
+
+// datasource db {
+//   provider = "sqlite" // ✅ Test local
+//   url      = env("DATABASE_URL")
+//   // Pour production, changer en "postgresql" et mettre DATABASE_URL prod
+// }
+
+// // ======================================================
+// //                   ENUMERATIONS
+// // ======================================================
+// enum Role {
+//   SUPER_ADMIN
+//   ADMIN_ECOLE
+//   STUDENT
+// }
+
+// enum Licence {
+//   L1
+//   L2
+//   L3
+// }
+
+// enum PotType {
+//   L2
+//   L3
+//   L4
+// }
+
+// enum EligibleCommissionType {
+//   NONE
+//   L2
+//   L3
+//   L4
+// }
+
+// // ======================================================
+// //                   MODELES PRINCIPAUX
+// // ======================================================
+
+// model Utilisateur {
+//   id             Int         @id @default(autoincrement())
+//   nom            String
+//   email          String      @unique
+//   motDePasse     String
+//   role           Role
+//   ecoleId        Int?
+//   ecole          Ecole?      @relation(fields: [ecoleId], references: [id])
+
+//   // Relations
+//   achatsAchetes        Achat[]     @relation("AcheteurAchats")
+//   achatsEnregistres    Achat[]     @relation("AdminEnregistre")
+
+//   suiviGain            SuiviGain?
+
+//   // Totaux par niveau
+//   totalGagneL1   Float       @default(0)
+//   totalGagneL2   Float       @default(0)
+//   totalGagneL3   Float       @default(0)
+//   totalGagneL4   Float       @default(0)
+// }
+
+// model Ecole {
+//   id           Int            @id @default(autoincrement())
+//   nom          String         @unique
+//   ville        String?
+//   utilisateurs Utilisateur[]
+// }
+
+// model Achat {
+//   id                   Int           @id @default(autoincrement())
+//   acheteurId           Int
+//   acheteur             Utilisateur   @relation("AcheteurAchats", fields: [acheteurId], references: [id])
+
+//   licence              Licence
+//   montantPaye          Float
+//   dateAchat            DateTime      @default(now())
+
+//   enregistreParAdminId Int
+//   adminEnregistre      Utilisateur   @relation("AdminEnregistre", fields: [enregistreParAdminId], references: [id])
+
+//   potCommunId          Int?
+//   potCommun            PotCommun?    @relation(fields: [potCommunId], references: [id])
+
+//   profitSuperAdmin     ProfitSuperAdmin?
+// }
+
+// model PotCommun {
+//   id             Int        @id @default(autoincrement())
+//   typePot        PotType
+//   montantActuel  Float      @default(0)
+//   anneeCalcul    Int
+//   achats         Achat[]
+
+//   @@unique([typePot, anneeCalcul]) // <- indispensable pour upsert par combinaison
+// }
+
+// model SuiviGain {
+//   id                         Int                     @id @default(autoincrement())
+//   eleveId                    Int                     @unique
+//   eleve                      Utilisateur             @relation(fields: [eleveId], references: [id])
+
+//   eligibleProchaineCommission EligibleCommissionType @default(NONE)
+
+//   totalGagneL1               Float                   @default(0)
+//   totalGagneL2               Float                   @default(0)
+//   totalGagneL3               Float                   @default(0)
+//   totalGagneL4               Float                   @default(0)
+// }
+
+// model ProfitSuperAdmin {
+//   id          Int      @id @default(autoincrement())
+//   achatId     Int      @unique
+//   achat       Achat    @relation(fields: [achatId], references: [id])
+//   montant     Float
+//   dateGain    DateTime @default(now())
+// }
+// ======================================================
+//               CONFIGURATION DE LA BASE
+// ======================================================
+// generator client {
+//   provider = "prisma-client-js"
+// }
+
+// datasource db {
+//   provider = "sqlite" // ✅ Test local
+//   url      = env("DATABASE_URL")
+//   // Pour production, changer en "postgresql" et mettre DATABASE_URL prod
+// }
+
+// // ======================================================
+// //                   ENUMERATIONS
+// // ======================================================
+// enum Role {
+//   SUPER_ADMIN
+//   ADMIN_ECOLE
+//   STUDENT
+// }
+
+// enum Licence {
+//   L1
+//   L2
+//   L3
+// }
+
+// enum PotType {
+//   L2
+//   L3
+//   L4
+// }
+
+// enum EligibleCommissionType {
+//   NONE
+//   L2
+//   L3
+//   L4
+// }
+
+// // ======================================================
+// //                   MODELES PRINCIPAUX
+// // ======================================================
+
+// model Utilisateur {
+//   id             Int         @id @default(autoincrement())
+//   nom            String
+//   email          String      @unique
+//   motDePasse     String
+//   role           Role
+//   ecoleId        Int?
+//   ecole          Ecole?      @relation(fields: [ecoleId], references: [id])
+
+//   // Relations
+//   achatsAchetes        Achat[]     @relation("AcheteurAchats")
+//   achatsEnregistres    Achat[]     @relation("AdminEnregistre")
+
+//   suiviGain            SuiviGain?
+
+//   // Totaux par niveau
+//   totalGagneL1   Float       @default(0)
+//   totalGagneL2   Float       @default(0)
+//   totalGagneL3   Float       @default(0)
+//   totalGagneL4   Float       @default(0)
+// }
+
+// model Ecole {
+//   id           Int            @id @default(autoincrement())
+//   nom          String         @unique
+//   ville        String?
+//   utilisateurs Utilisateur[]
+// }
+
+// model Achat {
+//   id                   Int           @id @default(autoincrement())
+//   acheteurId           Int
+//   acheteur             Utilisateur   @relation("AcheteurAchats", fields: [acheteurId], references: [id])
+
+//   licence              Licence
+//   montantPaye          Float
+//   dateAchat            DateTime      @default(now())
+//   anneeAchat           Int           @default(2025) // ✅ Valeur par défaut pour migration
+
+//   enregistreParAdminId Int
+//   adminEnregistre      Utilisateur   @relation("AdminEnregistre", fields: [enregistreParAdminId], references: [id])
+
+//   potCommunId          Int?
+//   potCommun            PotCommun?    @relation(fields: [potCommunId], references: [id])
+
+//   profitSuperAdmin     ProfitSuperAdmin?
+// }
+
+// model PotCommun {
+//   id             Int        @id @default(autoincrement())
+//   typePot        PotType
+//   montantActuel  Float      @default(0)
+//   anneeCalcul    Int
+//   achats         Achat[]
+
+//   @@unique([typePot, anneeCalcul]) // <- indispensable pour upsert par combinaison
+// }
+
+// model SuiviGain {
+//   id                         Int                     @id @default(autoincrement())
+//   eleveId                    Int                     @unique
+//   eleve                      Utilisateur             @relation(fields: [eleveId], references: [id])
+
+//   eligibleProchaineCommission EligibleCommissionType @default(NONE)
+
+//   totalGagneL1               Float                   @default(0)
+//   totalGagneL2               Float                   @default(0)
+//   totalGagneL3               Float                   @default(0)
+//   totalGagneL4               Float                   @default(0)
+// }
+
+// model ProfitSuperAdmin {
+//   id          Int      @id @default(autoincrement())
+//   achatId     Int      @unique
+//   achat       Achat    @relation(fields: [achatId], references: [id])
+//   montant     Float
+//   dateGain    DateTime @default(now())
+// }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")  // ❌ Commente ou supprime cette ligne
+}
+model Student {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String?  @unique
+  createdAt DateTime @default(now())
+  
+  purchases           Purchase[]
+  commissionsReceived Commission[] @relation("Beneficiaire")
+  commissionsFrom     Commission[] @relation("Source")
+}
+
+model Purchase {
+  id           Int      @id @default(autoincrement())
+  studentId    Int
+  level        String   // L1, L2, L3, L4
+  price        Float
+  year         Int
+  purchaseDate DateTime @default(now())
+  
+  student     Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  commissions Commission[] @relation("FromPurchase")
+  
+  @@index([level, year])
+  @@index([studentId, year])
+}
+
+model Commission {
+  id                Int      @id @default(autoincrement())
+  beneficiaireId    Int?     // null pour L4
+  fromStudentId     Int
+  fromPurchaseId    Int
+  montant           Float
+  fromLevel         String
+  beneficiaireLevel String?
+  year              Int
+  type              String   @default("normal") // "normal", "L4_contest", "L4_winner"
+  statut            String   @default("non_paye")
+  createdAt         DateTime @default(now())
+  
+  beneficiaire Student?  @relation("Beneficiaire", fields: [beneficiaireId], references: [id], onDelete: SetNull)
+  fromStudent  Student   @relation("Source", fields: [fromStudentId], references: [id], onDelete: Cascade)
+  fromPurchase Purchase  @relation("FromPurchase", fields: [fromPurchaseId], references: [id], onDelete: Cascade)
+  
+  @@index([year, beneficiaireId])
+  @@index([type, year])
+  @@index([statut])
+}
+
+model Quota {
+  id     Int    @id @default(autoincrement())
+  level  String
+  year   Int
+  quota  Int
+  
+  @@unique([level, year], name: "quota_level_year_unique")
+}
+
+model L4Fund {
+  id          Int      @id @default(autoincrement())
+  year        Int      @unique
+  totalAmount Float    @default(0)
+  updatedAt   DateTime @updatedAt
+}

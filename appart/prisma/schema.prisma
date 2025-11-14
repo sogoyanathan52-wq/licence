@@ -1,0 +1,143 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// *** IMPORTANT : Réglé sur 'sqlite' pour le développement local rapide ***
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// --- ENUMS GLOBALES ---
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN_ECOLE // Renommé pour être plus clair (était SCHOOL_ADMIN)
+  STUDENT
+}
+
+enum Licence {
+  L1
+  L2
+  L3
+}
+
+// Types pour la logique du Pot Commun et de l'Éligibilité
+enum PotType {
+  L2 // Pot créé par les achats L1, distribué en commission L2
+  L3 // Pot créé par les achats L2, distribué en commission L3
+  L4 // Pot créé par les achats L3, distribué en Grand Prix L4
+}
+
+enum EligibleCommissionType {
+  NONE // Par défaut
+  L2   // Éligible à la commission L2
+  L3   // Éligible à la commission L3
+  L4   // Éligible au Grand Prix L4
+}
+
+// --- DÉBUT DES MODÈLES ---
+
+model Ecole {
+  id           Int           @id @default(autoincrement())
+  nom          String        @unique
+  ville        String?
+  utilisateurs Utilisateur[]
+}
+
+model Utilisateur {
+  id             String        @id @default(uuid())
+  ecoleId        Int
+  nom            String
+  email          String        @unique
+  motDePasse     String
+  role           Role          @default(STUDENT)
+  dateCreation   DateTime      @default(now())
+
+  // Relations
+  ecole          Ecole         @relation(fields: [ecoleId], references: [id])
+  // Achats effectués par cet utilisateur
+  achatsEffectues Achat[]       @relation("Acheteur")
+  // Commissions gagnées par cet utilisateur (L1, L2, L3, L4)
+  commissionsGagnees Commission[]
+
+  // Suivi de gain et éligibilité (1:1)
+  suiviGain      SuiviGain?
+
+  // Utilisateurs que cet utilisateur a parrainé
+  parrainages    Achat[]       @relation("Parrain")
+}
+
+// *** MODÈLE Achat (CORRIGÉ) ***
+model Achat {
+  id              String      @id @default(uuid())
+  acheteurId      String // L'utilisateur qui a fait l'achat
+  parrainId       String? // L'utilisateur qui a parrainé (pour L1)
+  licence         Licence
+  montantPaye     Decimal     @default(0.0)
+  dateAchat       DateTime    @default(now())
+  enregistreParAdminId String // L'admin qui a enregistré la transaction
+
+  // NOUVEAUX CHAMPS pour lier les commissions
+  commissionL1Id  String?     @unique // Commission de 70% donnée au parrain (si L1) - DOIT RESTER UNIQUE (1:1)
+  commissionPotId String?     // <-- Correction 1 : @unique ENLEVÉ !
+ 
+  // Relations
+  acheteur        Utilisateur @relation("Acheteur", fields: [acheteurId], references: [id])
+  parrain         Utilisateur? @relation("Parrain", fields: [parrainId], references: [id])
+  commissionL1    Commission?  @relation("CommissionL1", fields: [commissionL1Id], references: [id])
+  commissionPot   Commission?  @relation("CommissionPot", fields: [commissionPotId], references: [id])
+
+  // INDEXES
+  @@index([acheteurId, dateAchat])
+  @@index([commissionPotId]) // <-- Index non-unique ajouté
+}
+
+// *** MODÈLE SuiviGain (Mise à jour pour l'éligibilité) ***
+model SuiviGain {
+  id               String           @id @default(uuid())
+  eleveId          String           @unique
+ 
+  // Total des gains par niveau de commission
+  totalGagneL1     Decimal         @default(0)
+  totalGagneL2     Decimal         @default(0)
+  totalGagneL3     Decimal         @default(0)
+  totalGagneL4     Decimal         @default(0)
+
+  // NOUVEAU CHAMP : Marque l'éligibilité à la commission L(n+1)
+  eligibleProchaineCommission EligibleCommissionType @default(NONE)
+
+  // Relation
+  eleve            Utilisateur     @relation(fields: [eleveId], references: [id])
+}
+
+// *** NOUVEAU MODÈLE PotCommun (Générique pour L2, L3, L4) ***
+model PotCommun {
+  id              Int      @id @default(autoincrement())
+  anneeCalcul     Int
+  typePot         PotType
+  montantActuel   Decimal  @default(0)
+ 
+  // Clé composite pour garantir un seul pot par an et par type
+  @@unique([anneeCalcul, typePot])
+}
+
+// *** NOUVEAU MODÈLE Commission (Historique de toutes les commissions) ***
+model Commission {
+  id              String        @id @default(uuid())
+  utilisateurId   String // Celui qui reçoit la commission
+  montant         Decimal    
+  type            String // Ex: 'L1', 'L2', 'L3', 'L4'
+  dateCommission  DateTime    @default(now())
+  description     String
+
+  // Relations
+  utilisateur     Utilisateur   @relation(fields: [utilisateurId], references: [id])
+  achatL1         Achat?        @relation("CommissionL1")
+ 
+  // <-- Correction 2 : On change le nom de l'autre côté pour éviter le conflit
+  achatsPot       Achat[]       @relation("CommissionPot")
+}
