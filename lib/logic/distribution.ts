@@ -160,46 +160,40 @@ import { prisma } from '../db'
 
 const COMMISSION_RATE = 0.30
 
-/**
- * Type pour une vente éligible
- */
+// Type pour une vente éligible
 type EligiblePurchase = {
   student: {
     id: number
     name: string
-    email: string | null // 🔹 corrige l'erreur de type
+    email?: string
   }
   level: string
   year: number
   purchaseDate: Date
 }
 
-/**
- * Trouve les étudiants éligibles pour recevoir des commissions
- * RÈGLE : Éligible = a acheté LE MÊME NIVEAU l'année précédente (1 an seulement)
- */
+// Trouve les étudiants éligibles pour recevoir des commissions
 async function findEligibleStudents(level: string, year: number) {
   const previousYear = year - 1
 
-  const eligiblePurchases: EligiblePurchase[] = await prisma.purchase.findMany({
-    where: {
-      level,
-      year: previousYear,
-    },
-    include: {
-      student: true,
-    },
-    orderBy: {
-      purchaseDate: 'asc',
-    },
+  const purchases = await prisma.purchase.findMany({
+    where: { level, year: previousYear },
+    include: { student: true },
+    orderBy: { purchaseDate: 'asc' },
   })
 
-  return eligiblePurchases.map((p) => p.student)
+  // Transformation pour correspondre au type EligiblePurchase
+  const eligiblePurchases: EligiblePurchase[] = purchases.map(p => ({
+    student: p.student,
+    level: p.level,
+    year: p.year,
+    purchaseDate: p.purchaseDate,
+  }))
+
+  return eligiblePurchases.map(p => p.student)
 }
 
-/**
- * Compte combien de commissions un étudiant a déjà reçu cette année
- */
+// Compte combien de commissions un étudiant a déjà reçu cette année
 async function getReceivedCount(studentId: number, level: string, year: number) {
   return await prisma.commission.count({
     where: {
@@ -211,9 +205,7 @@ async function getReceivedCount(studentId: number, level: string, year: number) 
   })
 }
 
-/**
- * Obtenir les infos de l'étudiant qui achète
- */
+// Obtenir les infos de l'étudiant qui achète
 async function getStudentInfo(studentId: number) {
   return await prisma.student.findUnique({
     where: { id: studentId },
@@ -221,9 +213,7 @@ async function getStudentInfo(studentId: number) {
   })
 }
 
-/**
- * Distribue une commission selon la logique de quota et d'ordre
- */
+// Distribue une commission selon la logique de quota et d'ordre
 export async function distributeCommission(purchase: {
   id: number
   studentId: number
@@ -235,12 +225,17 @@ export async function distributeCommission(purchase: {
   const buyer = await getStudentInfo(purchase.studentId)
   const buyerName = buyer?.name || 'Étudiant'
 
-  // 🟢 Cas spécial : L3 → Fonds L4
+  // Cas spécial : L3 → Fonds L4
   if (purchase.level === 'L3') {
     await prisma.l4Fund.upsert({
       where: { year: purchase.year },
-      update: { totalAmount: { increment: commissionAmount } },
-      create: { year: purchase.year, totalAmount: commissionAmount },
+      update: {
+        totalAmount: { increment: commissionAmount },
+      },
+      create: {
+        year: purchase.year,
+        totalAmount: commissionAmount,
+      },
     })
 
     await prisma.commission.create({
@@ -264,7 +259,7 @@ export async function distributeCommission(purchase: {
     }
   }
 
-  // 🟡 Cas normal : distribution aux éligibles
+  // Cas normal : distribution aux éligibles
   const eligibles = await findEligibleStudents(purchase.level, purchase.year)
 
   if (eligibles.length === 0) {
@@ -275,10 +270,10 @@ export async function distributeCommission(purchase: {
     }
   }
 
-  // 🔵 Récupérer le quota pour ce niveau/année
+  // Récupérer le quota pour ce niveau/année
   const quotaRecord = await prisma.quota.findUnique({
     where: {
-      level_year: {
+      quota_level_year_unique: {
         level: purchase.level,
         year: purchase.year,
       },
@@ -287,7 +282,7 @@ export async function distributeCommission(purchase: {
 
   const quota = quotaRecord?.quota || 999
 
-  // 🔴 Trouver le premier éligible qui n'a pas atteint son quota
+  // Trouver le premier éligible qui n'a pas atteint son quota
   for (const eligible of eligibles) {
     const receivedCount = await getReceivedCount(eligible.id, purchase.level, purchase.year)
 
