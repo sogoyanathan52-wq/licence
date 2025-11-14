@@ -161,27 +161,40 @@ import { prisma } from '../db'
 const COMMISSION_RATE = 0.30
 
 /**
+ * Type pour une vente éligible
+ */
+type EligiblePurchase = {
+  student: {
+    id: number
+    name: string
+    email?: string
+  }
+  level: string
+  year: number
+  purchaseDate: Date
+}
+
+/**
  * Trouve les étudiants éligibles pour recevoir des commissions
  * RÈGLE : Éligible = a acheté LE MÊME NIVEAU l'année précédente (1 an seulement)
  */
 async function findEligibleStudents(level: string, year: number) {
   const previousYear = year - 1
-  
-  // Trouver tous ceux qui ont acheté LE MÊME niveau l'année dernière
-  const eligiblePurchases = await prisma.purchase.findMany({
+
+  const eligiblePurchases: EligiblePurchase[] = await prisma.purchase.findMany({
     where: {
-      level: level,        // ✅ Même niveau
-      year: previousYear,  // ✅ Année précédente
+      level,
+      year: previousYear,
     },
     include: {
       student: true,
     },
     orderBy: {
-      purchaseDate: 'asc', // Ordre d'achat (le plus ancien en premier)
+      purchaseDate: 'asc',
     },
   })
-  
-  return eligiblePurchases.map(p => p.student)
+
+  return eligiblePurchases.map((p: EligiblePurchase) => p.student)
 }
 
 /**
@@ -192,7 +205,7 @@ async function getReceivedCount(studentId: number, level: string, year: number) 
     where: {
       beneficiaireId: studentId,
       fromLevel: level,
-      year: year,
+      year,
       type: 'normal',
     },
   })
@@ -221,8 +234,8 @@ export async function distributeCommission(purchase: {
   const commissionAmount = purchase.price * COMMISSION_RATE
   const buyer = await getStudentInfo(purchase.studentId)
   const buyerName = buyer?.name || 'Étudiant'
-  
-  // Cas spécial : L3 → Fonds L4
+
+  // 🟢 Cas spécial : L3 → Fonds L4
   if (purchase.level === 'L3') {
     await prisma.l4Fund.upsert({
       where: { year: purchase.year },
@@ -234,8 +247,7 @@ export async function distributeCommission(purchase: {
         totalAmount: commissionAmount,
       },
     })
-    
-    // Enregistrer la commission pour traçabilité
+
     await prisma.commission.create({
       data: {
         beneficiaireId: null,
@@ -249,17 +261,17 @@ export async function distributeCommission(purchase: {
         statut: 'en_attente',
       },
     })
-    
+
     return {
       type: 'L4_fund',
       amount: commissionAmount,
       message: `${buyerName} est maintenant éligible pour le concours L4 ${purchase.year + 1}. ${commissionAmount} FCFA ajouté au fonds L4 ${purchase.year}`,
     }
   }
-  
-  // Cas normal : distribution aux éligibles
+
+  // 🟡 Cas normal : distribution aux éligibles
   const eligibles = await findEligibleStudents(purchase.level, purchase.year)
-  
+
   if (eligibles.length === 0) {
     return {
       type: 'no_eligible',
@@ -267,8 +279,8 @@ export async function distributeCommission(purchase: {
       message: `${buyerName} est maintenant éligible à recevoir des gains de ${purchase.level} ${purchase.year + 1}, mais aucun étudiant éligible pour recevoir ses 30% (fonds gardé par SuperAdmin)`,
     }
   }
-  
-  // Récupérer le quota pour ce niveau/année
+
+  // 🔵 Récupérer le quota pour ce niveau/année
   const quotaRecord = await prisma.quota.findUnique({
     where: {
       level_year: {
@@ -277,17 +289,17 @@ export async function distributeCommission(purchase: {
       },
     },
   })
-  
+
   const quota = quotaRecord?.quota || 999
-  
-  // Trouver le premier éligible qui n'a pas atteint son quota
+
+  // 🔴 Trouver le premier éligible qui n'a pas atteint son quota
   for (const eligible of eligibles) {
     const receivedCount = await getReceivedCount(
       eligible.id,
       purchase.level,
       purchase.year
     )
-    
+
     if (receivedCount < quota) {
       await prisma.commission.create({
         data: {
@@ -302,10 +314,10 @@ export async function distributeCommission(purchase: {
           statut: 'non_paye',
         },
       })
-      
+
       const nextYear = purchase.year + 1
       const previousYear = purchase.year - 1
-      
+
       return {
         type: 'commission',
         beneficiaire: eligible.name,
@@ -318,7 +330,7 @@ export async function distributeCommission(purchase: {
       }
     }
   }
-  
+
   return {
     type: 'quota_full',
     amount: commissionAmount,
