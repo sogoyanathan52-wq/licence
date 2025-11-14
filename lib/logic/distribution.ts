@@ -167,7 +167,7 @@ type EligiblePurchase = {
   student: {
     id: number
     name: string
-    email?: string
+    email: string | null // 🔹 corrige l'erreur de type
   }
   level: string
   year: number
@@ -194,7 +194,7 @@ async function findEligibleStudents(level: string, year: number) {
     },
   })
 
-  return eligiblePurchases.map((p: EligiblePurchase) => p.student)
+  return eligiblePurchases.map((p) => p.student)
 }
 
 /**
@@ -239,13 +239,8 @@ export async function distributeCommission(purchase: {
   if (purchase.level === 'L3') {
     await prisma.l4Fund.upsert({
       where: { year: purchase.year },
-      update: {
-        totalAmount: { increment: commissionAmount },
-      },
-      create: {
-        year: purchase.year,
-        totalAmount: commissionAmount,
-      },
+      update: { totalAmount: { increment: commissionAmount } },
+      create: { year: purchase.year, totalAmount: commissionAmount },
     })
 
     await prisma.commission.create({
@@ -294,11 +289,7 @@ export async function distributeCommission(purchase: {
 
   // 🔴 Trouver le premier éligible qui n'a pas atteint son quota
   for (const eligible of eligibles) {
-    const receivedCount = await getReceivedCount(
-      eligible.id,
-      purchase.level,
-      purchase.year
-    )
+    const receivedCount = await getReceivedCount(eligible.id, purchase.level, purchase.year)
 
     if (receivedCount < quota) {
       await prisma.commission.create({
