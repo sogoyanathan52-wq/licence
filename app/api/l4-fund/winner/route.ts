@@ -173,7 +173,6 @@ export async function POST(req: NextRequest) {
     
     const { year, studentId, amount } = validated
     
-    // Vérifier que l'étudiant existe et a acheté L3 cette année
     const student = await prisma.student.findUnique({
       where: { id: studentId },
       include: {
@@ -200,7 +199,6 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    // Vérifier que le fonds existe et a assez d'argent
     const fund = await prisma.l4Fund.findUnique({
       where: { year },
     })
@@ -219,9 +217,7 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    // Transaction : enregistrer le gagnant + déduire du fonds
-    await prisma.$transaction(async (tx: any) => {  // ✅ CORRECTION ICI
-      // Enregistrer la commission gagnante
+    await prisma.$transaction(async (tx: any) => {
       await tx.commission.create({
         data: {
           beneficiaireId: studentId,
@@ -236,7 +232,6 @@ export async function POST(req: NextRequest) {
         },
       })
       
-      // Déduire du fonds L4
       await tx.l4Fund.update({
         where: { year },
         data: {
@@ -257,7 +252,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation échouée', details: error.errors },
+        { error: 'Validation échouée', details: error.issues },  // ✅ CORRECTION ICI
         { status: 400 }
       )
     }
@@ -270,7 +265,6 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Voir tous les gagnants L4
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
@@ -290,14 +284,14 @@ export async function GET(req: NextRequest) {
     })
     
     return NextResponse.json({
-      winners: winners.map(w => ({
+      winners: winners.map((w: any) => ({
         year: w.year,
         name: w.beneficiaire?.name,
         amount: w.montant,
         date: w.createdAt,
         statut: w.statut,
       })),
-      totalDistributed: winners.reduce((sum, w) => sum + w.montant, 0),
+      totalDistributed: winners.reduce((sum: number, w: any) => sum + w.montant, 0),
     })
   } catch (error) {
     console.error('Erreur récupération gagnants L4:', error)
