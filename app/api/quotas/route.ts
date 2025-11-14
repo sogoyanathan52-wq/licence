@@ -83,10 +83,9 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
     const validated = QuotaSchema.parse(body)
-    
     const quota = await prisma.quota.upsert({
       where: {
-        level_year: {
+        quota_level_year_unique: {
           level: validated.level,
           year: validated.year,
         },
@@ -96,16 +95,16 @@ export async function POST(req: NextRequest) {
       },
       create: validated,
     })
-    
+
     return NextResponse.json({ success: true, quota })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation échouée', details: error.issues },  // ✅ CORRIGÉ
+        { error: 'Validation échouée', details: error.issues },
         { status: 400 }
       )
     }
-    
+
     console.error('Erreur gestion quota:', error)
     return NextResponse.json(
       { error: 'Erreur serveur' },
@@ -119,13 +118,13 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url)
     const level = searchParams.get('level')
     const year = searchParams.get('year')
-    
+
     const where: any = {}
     if (level) where.level = level
     if (year) where.year = parseInt(year)
-    
+
     const quotas = await prisma.quota.findMany({ where })
-    
+
     return NextResponse.json({ quotas })
   } catch (error) {
     console.error('Erreur récupération quotas:', error)
