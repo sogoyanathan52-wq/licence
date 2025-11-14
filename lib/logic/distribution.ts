@@ -160,7 +160,9 @@ import { prisma } from '../db'
 
 const COMMISSION_RATE = 0.30
 
-// Type pour une vente éligible
+/**
+ * Type pour une vente éligible
+ */
 type EligiblePurchase = {
   student: {
     id: number
@@ -172,19 +174,33 @@ type EligiblePurchase = {
   purchaseDate: Date
 }
 
-// Trouve les étudiants éligibles pour recevoir des commissions
+/**
+ * Trouve les étudiants éligibles pour recevoir des commissions
+ * RÈGLE : Éligible = a acheté LE MÊME NIVEAU l'année précédente (1 an seulement)
+ */
 async function findEligibleStudents(level: string, year: number) {
   const previousYear = year - 1
 
   const purchases = await prisma.purchase.findMany({
-    where: { level, year: previousYear },
-    include: { student: true },
-    orderBy: { purchaseDate: 'asc' },
+    where: {
+      level,
+      year: previousYear,
+    },
+    include: {
+      student: true,
+    },
+    orderBy: {
+      purchaseDate: 'asc',
+    },
   })
 
   // Transformation pour correspondre au type EligiblePurchase
   const eligiblePurchases: EligiblePurchase[] = purchases.map(p => ({
-    student: p.student,
+    student: {
+      id: p.student.id,
+      name: p.student.name,
+      email: p.student.email ?? undefined, // ✅ Convertit null en undefined
+    },
     level: p.level,
     year: p.year,
     purchaseDate: p.purchaseDate,
@@ -193,7 +209,9 @@ async function findEligibleStudents(level: string, year: number) {
   return eligiblePurchases.map(p => p.student)
 }
 
-// Compte combien de commissions un étudiant a déjà reçu cette année
+/**
+ * Compte combien de commissions un étudiant a déjà reçu cette année
+ */
 async function getReceivedCount(studentId: number, level: string, year: number) {
   return await prisma.commission.count({
     where: {
@@ -205,7 +223,9 @@ async function getReceivedCount(studentId: number, level: string, year: number) 
   })
 }
 
-// Obtenir les infos de l'étudiant qui achète
+/**
+ * Obtenir les infos de l'étudiant qui achète
+ */
 async function getStudentInfo(studentId: number) {
   return await prisma.student.findUnique({
     where: { id: studentId },
@@ -213,7 +233,9 @@ async function getStudentInfo(studentId: number) {
   })
 }
 
-// Distribue une commission selon la logique de quota et d'ordre
+/**
+ * Distribue une commission selon la logique de quota et d'ordre
+ */
 export async function distributeCommission(purchase: {
   id: number
   studentId: number
@@ -225,7 +247,7 @@ export async function distributeCommission(purchase: {
   const buyer = await getStudentInfo(purchase.studentId)
   const buyerName = buyer?.name || 'Étudiant'
 
-  // Cas spécial : L3 → Fonds L4
+  // 🟢 Cas spécial : L3 → Fonds L4
   if (purchase.level === 'L3') {
     await prisma.l4Fund.upsert({
       where: { year: purchase.year },
@@ -255,22 +277,26 @@ export async function distributeCommission(purchase: {
     return {
       type: 'L4_fund',
       amount: commissionAmount,
-      message: `${buyerName} est maintenant éligible pour le concours L4 ${purchase.year + 1}. ${commissionAmount} FCFA ajouté au fonds L4 ${purchase.year}`,
+      message: `${buyerName} est maintenant éligible pour le concours L4 ${
+        purchase.year + 1
+      }. ${commissionAmount} FCFA ajouté au fonds L4 ${purchase.year}`,
     }
   }
 
-  // Cas normal : distribution aux éligibles
+  // 🟡 Cas normal : distribution aux éligibles
   const eligibles = await findEligibleStudents(purchase.level, purchase.year)
 
   if (eligibles.length === 0) {
     return {
       type: 'no_eligible',
       amount: commissionAmount,
-      message: `${buyerName} est maintenant éligible à recevoir des gains de ${purchase.level} ${purchase.year + 1}, mais aucun étudiant éligible pour recevoir ses 30% (fonds gardé par SuperAdmin)`,
+      message: `${buyerName} est maintenant éligible à recevoir des gains de ${
+        purchase.level
+      } ${purchase.year + 1}, mais aucun étudiant éligible pour recevoir ses 30% (fonds gardé par SuperAdmin)`,
     }
   }
 
-  // Récupérer le quota pour ce niveau/année
+  // 🔵 Récupérer le quota pour ce niveau/année
   const quotaRecord = await prisma.quota.findUnique({
     where: {
       quota_level_year_unique: {
@@ -282,9 +308,13 @@ export async function distributeCommission(purchase: {
 
   const quota = quotaRecord?.quota || 999
 
-  // Trouver le premier éligible qui n'a pas atteint son quota
+  // 🔴 Trouver le premier éligible qui n'a pas atteint son quota
   for (const eligible of eligibles) {
-    const receivedCount = await getReceivedCount(eligible.id, purchase.level, purchase.year)
+    const receivedCount = await getReceivedCount(
+      eligible.id,
+      purchase.level,
+      purchase.year
+    )
 
     if (receivedCount < quota) {
       await prisma.commission.create({
@@ -312,7 +342,11 @@ export async function distributeCommission(purchase: {
         amount: commissionAmount,
         quotaUsed: receivedCount + 1,
         quotaMax: quota,
-        message: `${buyerName} est maintenant éligible à recevoir des gains de ${purchase.level} ${nextYear}, et ses 30% (${commissionAmount} FCFA) sont versés à ${eligible.name} (${purchase.level} ${previousYear}, quota ${receivedCount + 1}/${quota})`,
+        message: `${buyerName} est maintenant éligible à recevoir des gains de ${
+          purchase.level
+        } ${nextYear}, et ses 30% (${commissionAmount} FCFA) sont versés à ${
+          eligible.name
+        } (${purchase.level} ${previousYear}, quota ${receivedCount + 1}/${quota})`,
       }
     }
   }
@@ -320,6 +354,8 @@ export async function distributeCommission(purchase: {
   return {
     type: 'quota_full',
     amount: commissionAmount,
-    message: `${buyerName} est maintenant éligible à recevoir des gains de ${purchase.level} ${purchase.year + 1}, mais tous les étudiants éligibles ont atteint leur quota (fonds gardé par SuperAdmin)`,
+    message: `${buyerName} est maintenant éligible à recevoir des gains de ${
+      purchase.level
+    } ${purchase.year + 1}, mais tous les étudiants éligibles ont atteint leur quota (fonds gardé par SuperAdmin)`,
   }
 }
