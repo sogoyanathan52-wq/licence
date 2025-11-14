@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
       )
     }
     
-    // ✅ CORRECTION : Vérifier l'étudiant AVANT la transaction
+    // ✅ Vérifier l'étudiant AVANT la transaction
     let student = email
       ? await prisma.student.findUnique({ where: { email } })
       : await prisma.student.findFirst({ where: { name } })
@@ -238,7 +238,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Validation échouée', details: error.errors },
+        { error: 'Validation échouée', details: error.issues },  // ✅ CORRIGÉ
         { status: 400 }
       )
     }
